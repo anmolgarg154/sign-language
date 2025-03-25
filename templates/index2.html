@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign Language Recognition</title>
+</head>
+
+<body>
+    <h1>Sign Language Recognition</h1>
+    <div>
+        <video id="video" width="640" height="480" autoplay playsinline></video>
+        <button id="startButton" disabled>Start Recording</button>
+        <button id="stopButton" disabled>Stop Recording</button>
+    </div>
+    <div id="result">
+        <span id="predictedText">Predicted Text: </span>
+        <span id="predictedValue">-</span>
+    </div>
+
+    <!-- Audio elements for playback -->
+    <audio id="helloAudio1" src="/audios/hello%20welcome%20to%20UPITS%202024.mp3" preload="auto"></audio>
+    <audio id="helloAudio2" src="/audios/what%20is%20your%20name.mp3" preload="auto"></audio>
+    <audio id="helloAudio3" src="/audios/how%20are%20you.mp3" preload="auto"></audio>
+    <audio id="helloAudio4" src="/audios/where%20are%20you%20from.mp3" preload="auto"></audio>
+    <audio id="helloAudio5" src="/audios/have%20a%20great%20day.mp3" preload="auto"></audio>
+
+    <script>
+        const video = document.getElementById('video');
+        const startButton = document.getElementById('startButton');
+        const stopButton = document.getElementById('stopButton');
+        const predictedTextSpan = document.getElementById('predictedValue');
+
+        const helloAudio1 = document.getElementById('helloAudio1');
+        const helloAudio2 = document.getElementById('helloAudio2');
+        const helloAudio3 = document.getElementById('helloAudio3');
+        const helloAudio4 = document.getElementById('helloAudio4');
+        const helloAudio5 = document.getElementById('helloAudio5');
+
+        let stream;
+        let canvas;
+        let context;
+        let frameProcessor;
+
+        // Initialize the camera and video stream
+        async function initCamera() {
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                video.srcObject = stream;
+                startButton.disabled = false; // Enable start button once the stream is available
+            } catch (error) {
+                console.error('Error accessing the camera:', error);
+            }
+        }
+
+        // Function to send frames to Flask server
+        async function sendFrame(frame) {
+            const response = await fetch('/process_frame', {
+                method: 'POST',
+                body: JSON.stringify({ frame: frame }),
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                predictedTextSpan.textContent = data.predicted_text;
+                console.log("Predicted text:", data.predicted_text);
+                playAudio(data.predicted_text);
+            } else {
+                console.error("Error processing frame:", response.statusText);
+            }
+        }
+
+        // Function to play audio based on predicted text
+        function playAudio(predictedText) {
+            switch (predictedText) {
+                case "hello welcome to UPITS 2024":
+                    helloAudio1.play();
+                    break;
+                case "what is your name":
+                    helloAudio2.play();
+                    break;
+                case "how are you":
+                    helloAudio3.play();
+                    break;
+                case "where are you from":
+                    helloAudio4.play();
+                    break;
+                case "have a great day":
+                    helloAudio5.play();
+                    break;
+                default:
+                    console.log("No audio associated with the prediction.");
+            }
+        }
+
+        // Start processing frames from the video stream
+        function startRecording() {
+            canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            context = canvas.getContext('2d');
+
+            frameProcessor = setInterval(async () => {
+                context.drawImage(video, 0, 0, canvas.width, canvas.height);
+                const base64ImageData = canvas.toDataURL('image/jpeg');
+                await sendFrame(base64ImageData);
+            }, 500); // Adjust the frame processing interval as needed
+
+            startButton.disabled = true;
+            stopButton.disabled = false;
+        }
+
+        // Stop video processing and clear the interval
+        function stopRecording() {
+            clearInterval(frameProcessor);
+            startButton.disabled = false;
+            stopButton.disabled = true;
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop()); // Stop the video stream
+            }
+        }
+
+        // Event listeners for buttons
+        startButton.addEventListener('click', startRecording);
+        stopButton.addEventListener('click', stopRecording);
+
+        // Initialize camera on page load
+        window.onload = initCamera;
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Sign Language Recognition</title>
+
+</head>
+
+<body>
+
+    <h1>Sign Language Recognition</h1>
+
+    <div>
+
+        <video id="video" width="640" height="480" autoplay></video>
+
+        <button id="startButton">Start Recording</button>
+
+        <button id="stopButton" disabled>Stop Recording</button>
+
+    </div>
+
+    <!-- Use a <span> element to display the predicted text -->
+
+    <div id="result"><span id="predictedText">Predicted Text: </span><span id="predictedValue">-</span></div>
+
+
+    <script>
+
+        const video = document.getElementById('video');
+
+        const startButton = document.getElementById('startButton');
+
+        const stopButton = document.getElementById('stopButton');
+
+        const predictedTextSpan = document.getElementById('predictedValue'); // Changed to 'predictedValue'
+
+        let stream;
+
+        let canvas;
+
+        let context;
+
+
+        // Get access to the camera
+
+        navigator.mediaDevices.getUserMedia({ video: true })
+
+            .then(mediaStream => {
+
+                video.srcObject = mediaStream;
+
+                stream = mediaStream;
+
+            })
+
+            .catch(error => {
+
+                console.error('Error accessing the camera:', error);
+
+            });
+
+
+        // Function to send frames to Flask server
+
+        async function sendFrame(frame) {
+
+            const response = await fetch('/process_frame', {
+
+                method: 'POST',
+
+                body: JSON.stringify({ frame: frame }),
+
+                headers: {
+
+                    'Content-Type': 'application/json'
+
+                }
+
+            });
+
+            const data = await response.json();
+
+            // Update the text content of the span element with the predicted text
+
+            predictedTextSpan.textContent = data.predicted_text; // Corrected to 'predicted_text'
+
+            console.log("Predicted text:", data.predicted_text); // Print predicted text on console
+
+        }
+
+
+        // Event listener for start button
+
+        startButton.addEventListener('click', () => {
+
+            canvas = document.createElement('canvas');
+
+            canvas.width = video.videoWidth;
+
+            canvas.height = video.videoHeight;
+
+            context = canvas.getContext('2d');
+
+            const frameProcessor = setInterval(async () => {
+
+                context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+                const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+
+                const base64ImageData = canvas.toDataURL('image/jpeg');
+
+                sendFrame(base64ImageData);
+
+            }, 500); // Change interval as needed
+
+            startButton.disabled = true;
+
+            stopButton.disabled = false;
+
+            stopButton.addEventListener('click', () => {
+
+                clearInterval(frameProcessor);
+
+                startButton.disabled = false;
+
+                stopButton.disabled = true;
+
+            });
+
+        });
+
+    </script>
+
+</body>
+
+</html>
